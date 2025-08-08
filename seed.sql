@@ -14,6 +14,19 @@ CREATE TABLE chatbot_characteristics (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
+-- NFT tracking table (only for NFT chatbots)
+CREATE TABLE chatbot_nfts (
+    id SERIAL PRIMARY KEY,
+    chatbot_id INT REFERENCES chatbots(id) ON DELETE CASCADE,
+    token_id VARCHAR(255) NOT NULL,
+    contract_address VARCHAR(255) NOT NULL,
+    ipfs_metadata_hash VARCHAR(255), -- IPFS hash for metadata
+    ipfs_image_hash VARCHAR(255),    -- IPFS hash for avatar image
+    metadata_url VARCHAR(512),       -- Full IPFS URL for metadata
+    minted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    UNIQUE(token_id, contract_address)
+);
+
 -- Create the guests table
 CREATE TABLE guests (
     id SERIAL PRIMARY KEY,

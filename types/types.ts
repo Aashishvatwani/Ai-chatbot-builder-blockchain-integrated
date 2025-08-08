@@ -1,9 +1,21 @@
+export interface ChatbotNFT {
+    id: number;
+    token_id: string;
+    contract_address: string;
+    metadata_ipfs_hash: string;
+    image_ipfs_hash: string;
+    creator_address: string;
+    created_at: string;
+    chatbot_id: number;
+}
+
 export interface Chatbot {
     id: number;
     name: string;
     created_at: string;
     clerk_user_id: string;
     chatbot_characteristics: ChatbotCharacteristic[];
+    chatbot_nfts?: ChatbotNFT[];
     chat_sessions: ChatSession[];
 }
 export interface ChatbotCharacteristic {

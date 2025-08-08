@@ -2,68 +2,316 @@
 import Avatar from "@/components/Avatar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMutation } from "@apollo/client";
 import client from "../../../../graphql/apollo-client";
 import { CREATE_CHATBOT } from "../../../../graphql/mutations/mutations";
+import { MINT_CHATBOT_NFT } from "../../../../graphql/mutations/blockchainMutations";
 import { useUser } from "@clerk/nextjs";
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
-
 import { useTransition } from "react";
+import { useWeb3 } from "@/components/Web3Provider";
+import { toast } from "sonner";
+import { Coins, Zap, Shield} from "lucide-react";
 
 function CreateChatpods() {
   const { user } = useUser();
   const [name, setName] = useState("");
+  const [shouldMintNFT, setShouldMintNFT] = useState(false);
+  const [characteristics, setCharacteristics] = useState<string[]>([]);
+  const [currentCharacteristic, setCurrentCharacteristic] = useState("");
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const { isConnected, mintChatbotNFT, connectWallet, account } = useWeb3();
 
-  const [Createchatpods] = useMutation(CREATE_CHATBOT, {
+  const [createChatbot] = useMutation(CREATE_CHATBOT, {
     client,
-    variables: {
-      clerk_user_id: user?.id,
-      name,
-    },
   });
+
+  const [mintNFTMutation] = useMutation(MINT_CHATBOT_NFT, {
+    client,
+  });
+
+  const addCharacteristic = () => {
+    if (currentCharacteristic.trim() && characteristics.length < 5) {
+      setCharacteristics([...characteristics, currentCharacteristic.trim()]);
+      setCurrentCharacteristic("");
+    }
+  };
+
+  const removeCharacteristic = (index: number) => {
+    setCharacteristics(characteristics.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
+    if (!name.trim()) {
+      toast.error("Please enter a chatbot name");
+      return;
+    }
+
+    if (shouldMintNFT && !isConnected) {
+      toast.error("Please connect your wallet to mint an NFT");
+      return;
+    }
+
     startTransition(async () => {
       try {
-        const { data } = await Createchatpods();
-        console.log("CreateChatBot data:", data);
+        // Step 1: Create chatbot in database
+        const { data } = await createChatbot({
+          variables: {
+            clerk_user_id: user?.id,
+            name,
+          },
+        });
+
+        const chatbotId = data.insert_chatbots.returning[0].id;
+        console.log("Chatbot created with ID:", chatbotId);
+
+        // Step 2: Add characteristics if any
+        if (characteristics.length > 0) {
+          // You would need to create a mutation to add multiple characteristics
+          // For now, we'll add them individually in the edit page
+        }
+
+        // Step 3: Mint NFT if requested
+        let nftResult = null;
+        if (shouldMintNFT && isConnected) {
+          try {
+            toast.loading("Minting NFT...", { id: "nft-mint" });
+            
+            nftResult = await mintChatbotNFT(
+              name,
+              characteristics.length > 0 ? characteristics : ["AI Assistant"],
+              chatbotId
+            );
+
+            // Record NFT in database
+            await mintNFTMutation({
+              variables: {
+                chatbot_id: chatbotId,
+                token_id: nftResult.tokenId,
+                contract_address: process.env.NEXT_PUBLIC_CHATBOT_NFT_ADDRESS,
+                ipfs_hash: nftResult.ipfsHashes?.metadataHash || null,
+              },
+            });
+
+            toast.success("NFT minted successfully!", { id: "nft-mint" });
+          } catch (error) {
+            console.error("Error minting NFT:", error);
+            toast.error("Failed to mint NFT, but chatbot was created", { id: "nft-mint" });
+          }
+        }
+
+        // Reset form
         setName("");
-        router.push(`/edit-chatpod/${data.insert_chatbots.returning[0].id}`);
+        setCharacteristics([]);
+        setShouldMintNFT(false);
+
+        // Navigate to edit page
+        router.push(`/edit-chatpod/${chatbotId}`);
+        
+        toast.success(
+          nftResult 
+            ? `Chatbot created and NFT minted! Token ID: ${nftResult.tokenId}` 
+            : "Chatbot created successfully!"
+        );
+
       } catch (error) {
-        console.error("Error while calling CreateChatBot:", error);
+        console.error("Error creating chatbot:", error);
+        toast.error("Failed to create chatbot");
       }
     });
   };
 
   return (
-    <div className="flex flex-col items-center gap-2 justify-center md:flex-row md:space-x-10 bg-white p-10 rounded-md m-10">
-      <Avatar seed="create-chatpod" />
-      <div>
-        <h1 className="text-xl lg:text-3xl font-semibold">Create</h1>
-        <h2 className="font-light">
-          Create a new chatpod to assist you in your conversation with your customer
-        </h2>
-        <form onSubmit={handleSubmit}>
-          <Input
-            placeholder="Chatbot Name..."
-            className="max-w-lg mb-1"
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <div className="flex justify-center">
-            <Button type="submit" disabled={isPending || !name}>
-              {isPending ? "Creating Chatbot..." : "Create Chatpod"}
-            </Button>
+    <div className="max-w-2xl mx-auto p-6 space-y-6">
+      <Card>
+        <CardHeader className="text-center">
+          <CardTitle className="flex items-center justify-center gap-2 text-2xl">
+            <Zap className="h-6 w-6 text-blue-500" />
+            Create Your AI ChatPod
+          </CardTitle>
+          <CardDescription>
+            Build a personalized AI assistant for your business
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center gap-6">
+            <Avatar seed={name || "create-chatpod"} className="w-20 h-20" />
+            
+            <form onSubmit={handleSubmit} className="w-full space-y-6">
+              {/* Chatbot Name */}
+              <div className="space-y-2">
+                <Label htmlFor="name" className="text-sm font-medium">
+                  Chatbot Name *
+                </Label>
+                <Input
+                  id="name"
+                  placeholder="e.g., Customer Support Bot"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  className="w-full"
+                />
+                <p className="text-xs text-gray-500">
+                  Choose a memorable name for your AI assistant
+                </p>
+              </div>
+
+              {/* Characteristics */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">
+                  Initial Characteristics (Optional)
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="e.g., Friendly customer service agent"
+                    value={currentCharacteristic}
+                    onChange={(e) => setCurrentCharacteristic(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCharacteristic())}
+                    disabled={characteristics.length >= 5}
+                  />
+                  <Button
+                    type="button"
+                    onClick={addCharacteristic}
+                    disabled={!currentCharacteristic.trim() || characteristics.length >= 5}
+                    variant="outline"
+                  >
+                    Add
+                  </Button>
+                </div>
+                
+                {/* Display characteristics */}
+                {characteristics.length > 0 && (
+                  <div className="space-y-2">
+                    {characteristics.map((char, index) => (
+                      <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <span className="text-sm">{char}</span>
+                        <Button
+                          type="button"
+                          onClick={() => removeCharacteristic(index)}
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    ))}
+                    <p className="text-xs text-gray-500">
+                      {5 - characteristics.length} characteristics remaining
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* NFT Minting Option */}
+              <Card className="border-2 border-dashed border-blue-200">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4 text-blue-500" />
+                        <Label htmlFor="mint-nft" className="font-medium">
+                          Mint as NFT
+                        </Label>
+                        <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
+                          New
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-600">
+                        Create a blockchain-owned chatbot NFT
+                      </p>
+                    </div>
+                    <Switch
+                      id="mint-nft"
+                      checked={shouldMintNFT}
+                      onCheckedChange={setShouldMintNFT}
+                      disabled={!isConnected}
+                    />
+                  </div>
+                  
+                  {shouldMintNFT && (
+                    <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <Coins className="h-4 w-4 text-blue-600 mt-0.5" />
+                        <div className="text-xs text-blue-800">
+                          <p className="font-medium mb-1">NFT Benefits:</p>
+                          <ul className="space-y-1">
+                            <li>• True ownership of your AI chatbot</li>
+                            <li>• Earn tokens from conversations</li>
+                            <li>• Trade on NFT marketplaces</li>
+                            <li>• Proof of authenticity & creation</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Wallet Connection Status */}
+                  {!isConnected ? (
+                    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-yellow-800">Wallet Required for NFT</p>
+                          <p className="text-xs text-yellow-600">Connect your wallet to mint chatbot as NFT</p>
+                        </div>
+                        <Button 
+                          onClick={connectWallet}
+                          size="sm"
+                          variant="outline"
+                          className="border-yellow-300 text-yellow-700 hover:bg-yellow-100"
+                        >
+                          Connect Wallet
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <p className="text-sm font-medium text-green-800">Wallet Connected</p>
+                      </div>
+                      <p className="text-xs text-green-600 mt-1">
+                        {account ? `${account.slice(0, 6)}...${account.slice(-4)}` : 'Ready to mint NFT'}
+                      </p>
+                    </div>
+                  )}
+
+                  {!isConnected && shouldMintNFT && (
+                    <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
+                      ⚠️ Please connect your wallet first to enable NFT minting
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Submit Button */}
+              <Button 
+                type="submit" 
+                disabled={isPending || !name.trim()}
+                className="w-full"
+                size="lg"
+              >
+                {isPending ? (
+                  shouldMintNFT ? "Creating & Minting..." : "Creating Chatbot..."
+                ) : (
+                  shouldMintNFT ? "Create & Mint NFT" : "Create Chatbot"
+                )}
+              </Button>
+            </form>
+
+            <p className="text-xs text-gray-400 text-center">
+              You can always add more characteristics and features after creation
+            </p>
           </div>
-        </form>
-        <p className="text-gray-400 text-sm mt-2">Example: Customer Chatbot</p>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

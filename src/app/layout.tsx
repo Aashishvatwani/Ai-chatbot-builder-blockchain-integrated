@@ -7,6 +7,7 @@ import {
 } from '@clerk/nextjs'
 import ApolloProviderwrapper from "@/components/ApolloProvider";
 import { Toaster } from "@/components/ui/sonner"
+import { Web3Provider } from "@/components/Web3Provider";
 
 
 export const metadata: Metadata = {
@@ -23,6 +24,7 @@ export default  function RootLayout({
   return (
     <ApolloProviderwrapper>
     <ClerkProvider>
+    <Web3Provider>
     <html lang="en">
       <body
         className="min-h-screen  "
@@ -34,6 +36,7 @@ export default  function RootLayout({
 
       </body>
     </html>
+    </Web3Provider>
     </ClerkProvider>
     </ApolloProviderwrapper>
   );
