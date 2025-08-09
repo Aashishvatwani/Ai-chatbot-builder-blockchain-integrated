@@ -14,8 +14,8 @@ export interface Chatbot {
     name: string;
     created_at: string;
     clerk_user_id: string;
+    ipfs_hash?: string; // IPFS hash for metadata
     chatbot_characteristics: ChatbotCharacteristic[];
-    chatbot_nfts?: ChatbotNFT[];
     chat_sessions: ChatSession[];
 }
 export interface ChatbotCharacteristic {

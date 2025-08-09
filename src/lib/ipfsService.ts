@@ -32,6 +32,61 @@ class IPFSService {
   }
 
   /**
+   * Upload regular chatbot metadata to IPFS (for all chatbots)
+   * This creates standard metadata that can be used by Gemini AI
+   */
+  async uploadChatbotMetadata(
+    chatbotId: number,
+    name: string,
+    characteristics: string[]
+  ): Promise<{ metadataHash: string; metadataUrl: string }> {
+    try {
+      // Create general chatbot metadata
+      const metadata = {
+        name: `AI ChatBot: ${name}`,
+        description: `${name} - An intelligent conversational AI assistant with ${characteristics.length} unique characteristics.`,
+        characteristics,
+        chatbot_type: "AI Assistant",
+        created_at: new Date().toISOString(),
+        chatbot_id: chatbotId,
+        attributes: [
+          {
+            trait_type: "Bot Type",
+            value: "AI Assistant"
+          },
+          {
+            trait_type: "Characteristics Count",
+            value: characteristics.length
+          },
+          {
+            trait_type: "Platform",
+            value: "AI ChatPod"
+          },
+          ...characteristics.map((char, index) => ({
+            trait_type: `Characteristic ${index + 1}`,
+            value: char.substring(0, 100)
+          }))
+        ]
+      };
+
+      // Upload metadata JSON to IPFS
+      const metadataHash = await this.uploadJSON(
+        metadata as unknown as Record<string, unknown>,
+        `chatbot-${chatbotId}-metadata.json`
+      );
+
+      const metadataUrl = `https://gateway.pinata.cloud/ipfs/${metadataHash}`;
+
+      console.log(`Chatbot metadata uploaded: ${metadataUrl}`);
+      
+      return { metadataHash, metadataUrl };
+    } catch (error) {
+      console.error('Error uploading chatbot metadata to IPFS:', error);
+      throw new Error('Failed to upload chatbot metadata to IPFS');
+    }
+  }
+
+  /**
    * Upload NFT metadata to IPFS (only called when minting NFT)
    * Regular chatbots stay in database only
    */

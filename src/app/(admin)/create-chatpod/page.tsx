@@ -7,19 +7,21 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMutation } from "@apollo/client";
 import client from "../../../../graphql/apollo-client";
-import { CREATE_CHATBOT } from "../../../../graphql/mutations/mutations";
+import { CREATE_CHATBOT, CREATE_CHATBOT_BASIC, UPDATE_CHATPOD } from "../../../../graphql/mutations/mutations";
 import { MINT_CHATBOT_NFT } from "../../../../graphql/mutations/blockchainMutations";
 import { useUser } from "@clerk/nextjs";
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { useWeb3 } from "@/components/Web3Provider";
+import { ipfsService } from "@/lib/ipfsService";
 import { toast } from "sonner";
 import { Coins, Zap, Shield} from "lucide-react";
+import { useWeb3 } from "@/components/Web3Provider";
 
 function CreateChatpods() {
   const { user } = useUser();
   const [name, setName] = useState("");
+  const [ipfsHash, setIpfsHash] = useState("");
   const [shouldMintNFT, setShouldMintNFT] = useState(false);
   const [characteristics, setCharacteristics] = useState<string[]>([]);
   const [currentCharacteristic, setCurrentCharacteristic] = useState("");
@@ -28,6 +30,14 @@ function CreateChatpods() {
   const { isConnected, mintChatbotNFT, connectWallet, account } = useWeb3();
 
   const [createChatbot] = useMutation(CREATE_CHATBOT, {
+    client,
+  });
+
+  const [createChatbotBasic] = useMutation(CREATE_CHATBOT_BASIC, {
+    client,
+  });
+
+  const [updateChatbot] = useMutation(UPDATE_CHATPOD, {
     client,
   });
 
@@ -62,14 +72,48 @@ function CreateChatpods() {
     startTransition(async () => {
       try {
         // Step 1: Create chatbot in database
-        const { data } = await createChatbot({
-          variables: {
-            clerk_user_id: user?.id,
-            name,
-          },
+        console.log("Creating chatbot with variables:", {
+          clerk_user_id: user?.id,
+          name,
+          ipfs_hash: ipfsHash.trim() || null,
         });
+        
+        let data, errors;
 
-        const chatbotId = data.insert_chatbots.returning[0].id;
+        try {
+          // Try creating with IPFS hash field first
+          const result = await createChatbot({
+            variables: {
+              clerk_user_id: user?.id,
+              name,
+              ipfs_hash: ipfsHash.trim() || null,
+            },
+          });
+          data = result.data;
+          errors = result.errors;
+        } catch (createError) {
+          console.log("Main create failed, trying basic create:", createError);
+          // Fallback to basic creation without ipfs_hash
+          const result = await createChatbotBasic({
+            variables: {
+              clerk_user_id: user?.id,
+              name,
+            },
+          });
+          data = result.data;
+          errors = result.errors;
+        }
+
+        if (errors) {
+          console.error("GraphQL errors:", errors);
+          throw new Error(`GraphQL Error: ${errors.map(e => e.message).join(', ')}`);
+        }
+
+        if (!data?.insert_chatbots?.returning?.[0]?.id) {
+          throw new Error("Failed to create chatbot - no ID returned");
+        }
+
+       const  chatbotId = data.insert_chatbots.returning[0].id;
         console.log("Chatbot created with ID:", chatbotId);
 
         // Step 2: Add characteristics if any
@@ -78,7 +122,50 @@ function CreateChatpods() {
           // For now, we'll add them individually in the edit page
         }
 
-        // Step 3: Mint NFT if requested
+        // Step 3: Auto-generate IPFS metadata if no hash provided
+        let finalIpfsHash = ipfsHash.trim();
+        if (!finalIpfsHash && characteristics.length > 0) {
+          try {
+            toast.loading("Generating IPFS metadata...", { id: "ipfs-gen" });
+            const { metadataHash } = await ipfsService.uploadChatbotMetadata(
+              chatbotId,
+              name,
+              characteristics
+            );
+            finalIpfsHash = metadataHash;
+            
+            // Update chatbot with generated IPFS hash
+            console.log("Updating chatbot with IPFS hash:", {
+              id: chatbotId,
+              name: name,
+              ipfs_hash: metadataHash
+            });
+            
+            const { data: updateData, errors: updateErrors } = await updateChatbot({
+              variables: {
+                id: chatbotId,
+                name: name, // Keep the same name
+                ipfs_hash: metadataHash
+              }
+            });
+
+            if (updateErrors) {
+              console.error("Update GraphQL errors:", updateErrors);
+              throw new Error(`Update Error: ${updateErrors.map(e => e.message).join(', ')}`);
+            }
+
+            console.log("Chatbot updated successfully:", updateData);
+            
+            toast.success("IPFS metadata generated!", { id: "ipfs-gen" });
+            console.log("Auto-generated IPFS hash:", metadataHash);
+          } catch (ipfsError) {
+            console.error("IPFS upload failed, continuing without:", ipfsError);
+            toast.dismiss("ipfs-gen");
+            // Continue without IPFS - chatbot will work with just characteristics
+          }
+        }
+
+        // Step 4: Mint NFT if requested
         let nftResult = null;
         if (shouldMintNFT && isConnected) {
           try {
@@ -109,6 +196,7 @@ function CreateChatpods() {
 
         // Reset form
         setName("");
+        setIpfsHash("");
         setCharacteristics([]);
         setShouldMintNFT(false);
 
@@ -116,9 +204,9 @@ function CreateChatpods() {
         router.push(`/edit-chatpod/${chatbotId}`);
         
         toast.success(
-          nftResult 
-            ? `Chatbot created and NFT minted! Token ID: ${nftResult.tokenId}` 
-            : "Chatbot created successfully!"
+          finalIpfsHash 
+            ? `Chatbot created with IPFS metadata! ${nftResult ? `NFT Token ID: ${nftResult.tokenId}` : ''}` 
+            : `Chatbot created successfully! ${nftResult ? `NFT Token ID: ${nftResult.tokenId}` : ''}`
         );
 
       } catch (error) {
@@ -163,10 +251,27 @@ function CreateChatpods() {
                 </p>
               </div>
 
+              {/* IPFS Hash Input */}
+              <div className="space-y-2">
+                <Label htmlFor="ipfs-hash" className="text-sm font-medium">
+                  IPFS Metadata Hash (Optional)
+                </Label>
+                <Input
+                  id="ipfs-hash"
+                  placeholder="e.g., QmYourIPFSHashHere..."
+                  value={ipfsHash}
+                  onChange={(e) => setIpfsHash(e.target.value)}
+                  className="w-full font-mono text-sm"
+                />
+                <p className="text-xs text-gray-500">
+                  Optional: Provide existing IPFS hash or leave empty to auto-generate metadata from characteristics
+                </p>
+              </div>
+
               {/* Characteristics */}
               <div className="space-y-3">
                 <Label className="text-sm font-medium">
-                  Initial Characteristics (Optional)
+                  Initial Characteristics (Used for IPFS metadata)
                 </Label>
                 <div className="flex gap-2">
                   <Input
@@ -185,6 +290,9 @@ function CreateChatpods() {
                     Add
                   </Button>
                 </div>
+                <p className="text-xs text-gray-500">
+                  Add characteristics to auto-generate rich IPFS metadata for enhanced AI responses (max 5)
+                </p>
                 
                 {/* Display characteristics */}
                 {characteristics.length > 0 && (

@@ -67,20 +67,20 @@ function buildEnhancedSystemPrompt(
   
   // Add IPFS metadata context if available
   if (ipfsMetadata) {
-    systemPrompt += `NFT Chatbot Profile:
-- NFT Name: ${ipfsMetadata.name}
+    systemPrompt += `IPFS Enhanced Chatbot Profile:
+- Name: ${ipfsMetadata.name}
 - Description: ${ipfsMetadata.description}
 - Creator Address: ${ipfsMetadata.creator_address}
 - Creation Date: ${ipfsMetadata.created_at}`;
 
     if (ipfsMetadata.characteristics?.length > 0) {
       systemPrompt += `
-- Core NFT Characteristics: ${ipfsMetadata.characteristics.join(', ')}`;
+- Core IPFS Characteristics: ${ipfsMetadata.characteristics.join(', ')}`;
     }
 
     if (ipfsMetadata.attributes && ipfsMetadata.attributes.length > 0) {
       systemPrompt += `
-- NFT Attributes:`;
+- IPFS Attributes:`;
       ipfsMetadata.attributes.forEach(attr => {
         systemPrompt += `
   • ${attr.trait_type}: ${attr.value}`;
@@ -89,8 +89,9 @@ function buildEnhancedSystemPrompt(
 
     systemPrompt += `
 
-As an NFT chatbot, you embody the characteristics and attributes defined in your metadata. `;
+As an IPFS-enhanced chatbot, you embody the characteristics and attributes defined in your metadata. `;
   }
+  console.log("IPFS Metadata loaded:", !!ipfsMetadata);
 
   // Add regular chatbot characteristics
   const chatbotCharacteristics = chatbot.chatbot_characteristics.map((c: { content: string }) => c.content);
@@ -171,21 +172,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Chatbot not found" }, { status: 404 });
     }
 
-    // Check if this chatbot has NFT metadata
+    console.log("=== FULL CHATBOT DATA DEBUG ===");
+    console.log("Chatbot object:", JSON.stringify(chatbot, null, 2));
+    console.log("Chatbot ipfs_hash:", chatbot.ipfs_hash);
+    console.log("=== END CHATBOT DATA DEBUG ===");
+
+    // Check if this chatbot has IPFS metadata
     let ipfsMetadata: IPFSMetadata | null = null;
-    if (chatbot.chatbot_nfts && chatbot.chatbot_nfts.length > 0) {
-      const nftData = chatbot.chatbot_nfts[0]; // Get the first NFT
-      if (nftData.metadata_ipfs_hash) {
-        console.log("Fetching IPFS metadata for hash:", nftData.metadata_ipfs_hash);
-        ipfsMetadata = await fetchIPFSMetadata(nftData.metadata_ipfs_hash);
+    if (chatbot.ipfs_hash) {
+      console.log("Fetching IPFS metadata for hash:", chatbot.ipfs_hash);
+      try {
+        ipfsMetadata = await fetchIPFSMetadata(chatbot.ipfs_hash);
         if (ipfsMetadata) {
-          console.log("Successfully loaded NFT metadata for chatbot:", ipfsMetadata.name);
+          console.log("Successfully loaded IPFS metadata:", JSON.stringify(ipfsMetadata, null, 2));
         } else {
           console.log("Failed to load IPFS metadata, falling back to regular chatbot characteristics");
         }
+      } catch (error) {
+        console.error("Error fetching IPFS metadata:", error);
       }
     } else {
-      console.log("No NFT data found for chatbot, using regular characteristics");
+      console.log("No IPFS hash found for chatbot, using regular characteristics");
     }
 
     const messages: ChatHistory = (messageData.data?.chat_sessions?.[0]?.messages || []).map((msg: { sender: string; content: string }) => ({
@@ -195,12 +202,26 @@ export async function POST(req: NextRequest) {
 
     // 4. --- Construct the Request for Gemini with Enhanced Context ---
     const enhancedPrompt = buildEnhancedSystemPrompt(chatbot, ipfsMetadata);
+    console.log("=== DEBUGGING SYSTEM PROMPT FOR GEMINI ===");
+    console.log("Chatbot ID:", chatbot_id);
+    console.log("IPFS Hash:", chatbot.ipfs_hash);
+    console.log("IPFS Metadata loaded:", !!ipfsMetadata);
+    console.log("Enhanced Prompt being sent to Gemini:");
+    console.log("---START PROMPT---");
+    console.log(enhancedPrompt);
+    console.log("---END PROMPT---");
+    console.log("=== END DEBUG ===");
+    
     const systemInstruction = {
       role: 'system',
       parts: [{
         text: `You are a helpful assistant for ${name}. ${enhancedPrompt}If a question is outside this scope, politely inform the user that you can only answer questions related to the provided information. Use Emojis and tables to format your responses where it makes sense.`,
       }],
     };
+
+    console.log("=== FINAL SYSTEM INSTRUCTION TO GEMINI ===");
+    console.log(JSON.stringify(systemInstruction, null, 2));
+    console.log("=== END FINAL INSTRUCTION ===");
     const contents = formatForGemini(messages, content);
 
     // 5. --- Call the Google Gemini API with Streaming ---

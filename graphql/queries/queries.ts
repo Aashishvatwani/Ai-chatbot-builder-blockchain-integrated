@@ -16,6 +16,7 @@ query GetChatbotById($id:Int!){
         id
         name
         created_at
+        ipfs_hash
         chatbot_characteristics{
             id 
             content 

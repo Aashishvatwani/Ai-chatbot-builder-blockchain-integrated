@@ -1,7 +1,19 @@
 import { gql } from "@apollo/client";
 
 export const CREATE_CHATBOT = gql`
-  mutation CreateChatBot($clerk_user_id: String!, $name: String!) {
+  mutation CreateChatBot($clerk_user_id: String!, $name: String!, $ipfs_hash: String) {
+    insert_chatbots(objects: {clerk_user_id: $clerk_user_id, name: $name, ipfs_hash: $ipfs_hash}) {
+      returning {
+        id
+        name
+        ipfs_hash
+      }
+    }
+  }
+`;
+
+export const CREATE_CHATBOT_BASIC = gql`
+  mutation CreateChatBotBasic($clerk_user_id: String!, $name: String!) {
     insert_chatbots(objects: {clerk_user_id: $clerk_user_id, name: $name}) {
       returning {
         id
@@ -42,12 +54,13 @@ mutation AddCharacteristic($chatbotId: Int!, $content: String!) {
 }
 `
 export const UPDATE_CHATPOD=gql`
-mutation UpdateChatbot($id: Int!, $name: String!) {
-  update_chatbots(where: {id: {_eq: $id}}, _set: {name: $name}) {
+mutation UpdateChatbot($id: Int!, $name: String!, $ipfs_hash: String) {
+  update_chatbots(where: {id: {_eq: $id}}, _set: {name: $name, ipfs_hash: $ipfs_hash}) {
     affected_rows
     returning {
       id
       name
+      ipfs_hash
     }
   }
 }
