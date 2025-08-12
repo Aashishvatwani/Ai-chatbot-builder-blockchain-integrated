@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,10 @@ import { Badge } from '@/components/ui/badge';
 import SimpleWeb3Integration from '@/components/SimpleWeb3Integration';
 import Web3Dashboard from '@/components/Web3Dashboard';
 import { useUser } from '@clerk/nextjs';
+import { useQuery } from '@apollo/client';
+import { GET_USER_CHATPODS } from '../../../../graphql/queries/queries';
+import { GET_CHATBOT_NFT_DATA, GET_USER_WALLET_DATA_SAFE, GET_BLOCKCHAIN_TRANSACTIONS } from '../../../../graphql/queries/blockchainQueries';
+import { useWeb3 } from '@/components/Web3Provider';
 import { 
   Settings, 
   Wallet, 
@@ -19,13 +23,48 @@ import {
   Coins,
   ExternalLink,
   Copy,
-  Download
+  Download,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SettingsPage() {
   const { user } = useUser();
+  const { account } = useWeb3();
   const [activeTab, setActiveTab] = useState('general');
+
+  // Fetch user chatbots
+  const { data: chatbotsData, loading: chatbotsLoading } = useQuery(GET_USER_CHATPODS, {
+    variables: { userId: user?.id },
+    skip: !user?.id,
+  });
+
+  // Fetch wallet data for NFT count
+  const { data: walletData, loading: walletLoading } = useQuery(GET_USER_WALLET_DATA_SAFE, {
+    variables: { user_address: account },
+    skip: !account, // Skip the entire query if no wallet connected
+    errorPolicy: 'ignore',
+  });
+
+  // Fetch blockchain transactions
+  const { data: transactionsData, loading: transactionsLoading } = useQuery(GET_BLOCKCHAIN_TRANSACTIONS, {
+    variables: { 
+      user_address: account,
+      skip_transactions: true // Always skip the actual query since it's in @skip directive
+    },
+    skip: !account, // Skip the entire query if no wallet connected
+    errorPolicy: 'ignore',
+  });
+
+  // Calculate statistics
+  const chatbotsCount = chatbotsData?.chatbots?.length || 0;
+  const totalConversations = chatbotsData?.chatbots?.reduce(
+    (total: number, chatbot: {chat_sessions: {messages?: {created_at: string; sender: string}[]}[]}) => total + (chatbot.chat_sessions?.length || 0), 
+    0
+  ) || 0;
+  
+  // For NFTs, we'll use the Web3 dashboard data or wallet data
+  const nftsOwned = 0; // walletData?.user_wallets?.[0]?.token_balance || 0;
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -114,18 +153,49 @@ export default function SettingsPage() {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-600">0</div>
-                  <div className="text-sm text-gray-600">Chatbots Created</div>
+                  {chatbotsLoading ? (
+                    <div className="flex items-center justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="text-2xl font-bold text-blue-600">{chatbotsCount}</div>
+                      <div className="text-sm text-gray-600">Chatbots Created</div>
+                    </>
+                  )}
                 </div>
                 <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600">0</div>
-                  <div className="text-sm text-gray-600">Conversations</div>
+                  {chatbotsLoading ? (
+                    <div className="flex items-center justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin text-green-600" />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="text-2xl font-bold text-green-600">{totalConversations}</div>
+                      <div className="text-sm text-gray-600">Conversations</div>
+                    </>
+                  )}
                 </div>
                 <div className="text-center p-4 bg-purple-50 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-600">0</div>
-                  <div className="text-sm text-gray-600">NFTs Owned</div>
+                  {walletLoading || !account ? (
+                    <div className="flex items-center justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin text-purple-600" />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="text-2xl font-bold text-purple-600">{nftsOwned}</div>
+                      <div className="text-sm text-gray-600">NFTs Owned</div>
+                    </>
+                  )}
                 </div>
               </div>
+              {!account && (
+                <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
+                  <p className="text-sm text-yellow-800">
+                    Connect your wallet to see NFT statistics
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -192,6 +262,77 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Blockchain Activity</CardTitle>
+              <CardDescription>
+                Your latest blockchain transactions and earnings
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!account ? (
+                <div className="text-center py-6">
+                  <Wallet className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+                  <p className="text-gray-600">Connect your wallet to view blockchain activity</p>
+                </div>
+              ) : transactionsLoading ? (
+                <div className="text-center py-6">
+                  <Loader2 className="h-8 w-8 mx-auto animate-spin text-blue-600" />
+                  <p className="text-gray-600 mt-2">Loading transactions...</p>
+                </div>
+              ) : transactionsData?.blockchain_transactions?.length > 0 ? (
+                <div className="space-y-3">
+                  {transactionsData.blockchain_transactions.slice(0, 5).map((tx: {id: string;
+  token_type: 'CHAT' | 'NFT';
+  created_at: string;
+  amount: number;
+  chatbot?: {
+    name?: string;
+  }}) => (
+                    <div key={tx.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-2 h-2 rounded-full ${
+                          tx.token_type === 'CHAT' ? 'bg-green-500' : 'bg-blue-500'
+                        }`} />
+                        <div>
+                          <div className="font-medium text-sm">
+                            {tx.token_type === 'CHAT' ? 'Token Reward' : 'NFT Transaction'}
+                          </div>
+                          <div className="text-xs text-gray-600">
+                            {new Date(tx.created_at).toLocaleDateString()}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-medium text-sm">
+                          {tx.amount} {tx.token_type}
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          {tx.chatbot?.name || 'General'}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {transactionsData.blockchain_transactions.length > 5 && (
+                    <div className="text-center pt-3">
+                      <Button variant="outline" size="sm">
+                        View All Transactions
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <Coins className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+                  <p className="text-gray-600">No blockchain transactions yet</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Start creating and using chatbots to earn tokens!
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

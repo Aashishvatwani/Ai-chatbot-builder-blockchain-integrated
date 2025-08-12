@@ -112,3 +112,33 @@ query GetMessagesBySessionId($id:Int!){
         }
     }
 }`
+
+export const GET_MESSAGE_ANALYTICS=gql`
+query GetMessageAnalytics($userId:String!){
+    chatbots(where: { clerk_user_id: { _eq: $userId } }){
+        id
+        name
+        chat_sessions{
+            id
+            messages(where: { sender: { _eq: "guest" } }){
+                id 
+                content 
+                created_at 
+            }
+        }
+    }
+}`
+
+export const GET_ALL_USER_MESSAGES=gql`
+query GetAllUserMessages($userId:String!){
+    chatbots(where: { clerk_user_id: { _eq: $userId } }){
+        id
+        name
+        chat_sessions{
+            messages(where: { sender: { _eq: "guest" } }){
+                content 
+                created_at 
+            }
+        }
+    }
+}`

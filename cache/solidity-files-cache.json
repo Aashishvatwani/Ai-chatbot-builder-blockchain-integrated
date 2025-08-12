@@ -2,7 +2,7 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "F:\\bigprject2\\ai-chatpod\\contracts\\ChatbotNFT.sol": {
-      "lastModificationDate": 1754654320887,
+      "lastModificationDate": 1754658113074,
       "contentHash": "d8aeb26aa613ec778d837ca708454f70",
       "sourceName": "contracts/ChatbotNFT.sol",
       "solcConfig": {
@@ -355,6 +355,44 @@
         "IERC721"
       ]
     },
+    "F:\\bigprject2\\ai-chatpod\\node_modules\\@openzeppelin\\contracts\\token\\ERC721\\extensions\\IERC721Metadata.sol": {
+      "lastModificationDate": 1754652457246,
+      "contentHash": "136c64eca25bcb8a68f43ac6605559f9",
+      "sourceName": "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "../IERC721.sol"
+      ],
+      "versionPragmas": [
+        ">=0.6.2"
+      ],
+      "artifacts": [
+        "IERC721Metadata"
+      ]
+    },
     "F:\\bigprject2\\ai-chatpod\\node_modules\\@openzeppelin\\contracts\\token\\ERC721\\utils\\ERC721Utils.sol": {
       "lastModificationDate": 1754652457096,
       "contentHash": "4cefad279a37c895b709bce2b901816e",
@@ -394,10 +432,10 @@
         "ERC721Utils"
       ]
     },
-    "F:\\bigprject2\\ai-chatpod\\node_modules\\@openzeppelin\\contracts\\token\\ERC721\\extensions\\IERC721Metadata.sol": {
-      "lastModificationDate": 1754652457246,
-      "contentHash": "136c64eca25bcb8a68f43ac6605559f9",
-      "sourceName": "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol",
+    "F:\\bigprject2\\ai-chatpod\\node_modules\\@openzeppelin\\contracts\\utils\\math\\SafeCast.sol": {
+      "lastModificationDate": 1754652457355,
+      "contentHash": "2adca1150f58fc6f3d1f0a0f22ee7cca",
+      "sourceName": "@openzeppelin/contracts/utils/math/SafeCast.sol",
       "solcConfig": {
         "version": "0.8.20",
         "settings": {
@@ -422,14 +460,12 @@
           }
         }
       },
-      "imports": [
-        "../IERC721.sol"
-      ],
+      "imports": [],
       "versionPragmas": [
-        ">=0.6.2"
+        "^0.8.20"
       ],
       "artifacts": [
-        "IERC721Metadata"
+        "SafeCast"
       ]
     },
     "F:\\bigprject2\\ai-chatpod\\node_modules\\@openzeppelin\\contracts\\utils\\math\\Math.sol": {
@@ -469,42 +505,6 @@
       ],
       "artifacts": [
         "Math"
-      ]
-    },
-    "F:\\bigprject2\\ai-chatpod\\node_modules\\@openzeppelin\\contracts\\utils\\math\\SafeCast.sol": {
-      "lastModificationDate": 1754652457355,
-      "contentHash": "2adca1150f58fc6f3d1f0a0f22ee7cca",
-      "sourceName": "@openzeppelin/contracts/utils/math/SafeCast.sol",
-      "solcConfig": {
-        "version": "0.8.20",
-        "settings": {
-          "optimizer": {
-            "enabled": true,
-            "runs": 200
-          },
-          "evmVersion": "paris",
-          "outputSelection": {
-            "*": {
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers",
-                "metadata"
-              ],
-              "": [
-                "ast"
-              ]
-            }
-          }
-        }
-      },
-      "imports": [],
-      "versionPragmas": [
-        "^0.8.20"
-      ],
-      "artifacts": [
-        "SafeCast"
       ]
     },
     "F:\\bigprject2\\ai-chatpod\\node_modules\\@openzeppelin\\contracts\\utils\\math\\SignedMath.sol": {
@@ -879,8 +879,125 @@
         "IERC20Metadata"
       ]
     },
+    "F:\\bigprject2\\ai-chatpod\\contracts\\RealChatToken.sol": {
+      "lastModificationDate": 1754856489349,
+      "contentHash": "6f92a9bb46d8f62cae97bd739dbc0fb6",
+      "sourceName": "contracts/RealChatToken.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "@openzeppelin/contracts/token/ERC20/ERC20.sol",
+        "@openzeppelin/contracts/access/Ownable.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "RealChatToken"
+      ]
+    },
+    "F:\\bigprject2\\ai-chatpod\\contracts\\ImprovedChatToken.sol": {
+      "lastModificationDate": 1754836250013,
+      "contentHash": "bbab9f36abf5ca490a61ef9a0a5b268e",
+      "sourceName": "contracts/ImprovedChatToken.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "@openzeppelin/contracts/token/ERC20/ERC20.sol",
+        "@openzeppelin/contracts/access/Ownable.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "ImprovedChatToken"
+      ]
+    },
+    "F:\\bigprject2\\ai-chatpod\\contracts\\DailyRewardChatToken.sol": {
+      "lastModificationDate": 1754891332423,
+      "contentHash": "d28edf716c24002092a77f35330997ec",
+      "sourceName": "contracts/DailyRewardChatToken.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "@openzeppelin/contracts/token/ERC20/ERC20.sol",
+        "@openzeppelin/contracts/access/Ownable.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "DailyRewardChatToken"
+      ]
+    },
     "F:\\bigprject2\\ai-chatpod\\contracts\\ChatToken.sol": {
-      "lastModificationDate": 1754654253984,
+      "lastModificationDate": 1754655308965,
       "contentHash": "5d2021801d160cb69b31be2451521d81",
       "sourceName": "contracts/ChatToken.sol",
       "solcConfig": {
@@ -916,6 +1033,45 @@
       ],
       "artifacts": [
         "ChatToken"
+      ]
+    },
+    "F:\\bigprject2\\ai-chatpod\\contracts\\ImprovedDailyRewardChatToken.sol": {
+      "lastModificationDate": 1754904125909,
+      "contentHash": "3b701d9506d760fe2e371069796e50ab",
+      "sourceName": "contracts/ImprovedDailyRewardChatToken.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "@openzeppelin/contracts/token/ERC20/ERC20.sol",
+        "@openzeppelin/contracts/access/Ownable.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "ImprovedDailyRewardChatToken"
       ]
     }
   }

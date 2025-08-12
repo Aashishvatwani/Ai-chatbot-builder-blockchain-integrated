@@ -1,11 +1,28 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useWeb3 } from './Web3Provider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Wallet, Coins, Trophy, Zap } from 'lucide-react';
+import { Wallet, Coins, Trophy, Zap, TrendingUp, MessageCircle, Calendar, User, Bug } from 'lucide-react';
+import { web3Service } from '@/lib/web3Service';
+
+interface ChatbotMetadata {
+  name: string;
+  characteristics: string[];
+  conversationCount: number;
+  createdAt: number;
+  creator: string;
+  totalEarnings: number;
+}
+
+interface EnhancedChatbotData {
+  tokenId: string;
+  metadata: ChatbotMetadata;
+  formattedDate: string;
+  formattedEarnings: string;
+}
 
 export default function Web3Dashboard() {
   const { 
@@ -19,11 +36,93 @@ export default function Web3Dashboard() {
   } = useWeb3();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [enhancedChatbots, setEnhancedChatbots] = useState<EnhancedChatbotData[]>([]);
+  const [totalStats, setTotalStats] = useState({
+    totalConversations: 0,
+    totalEarnings: 0,
+    totalChatbots: 0,
+    averagePerBot: 0
+  });
+  const [debugInfo, setDebugInfo] = useState<{ nft: boolean; token: boolean } | null>(null);
+
+  // Debug function
+  const testConnection = async () => {
+    try {
+      const results = await web3Service.testContractConnection();
+      setDebugInfo(results);
+      console.log('Contract connection test results:', results);
+    } catch (error) {
+      console.error('Debug test failed:', error);
+    }
+  };
+
+  // Process chatbot data and calculate stats
+  useEffect(() => {
+    if (userChatbots.length > 0) {
+      const processed = userChatbots.map(chatbot => {
+        // Extract metadata - handle different possible structures
+        let metadata: ChatbotMetadata;
+        
+        if (chatbot.name && typeof chatbot.name === 'string') {
+          // If the data is already in the expected format
+          metadata = {
+            name: chatbot.name as string,
+            characteristics: (chatbot.characteristics as string[]) || [],
+            conversationCount: Number(chatbot.conversationCount) || 0,
+            createdAt: Number(chatbot.createdAt) || Date.now() / 1000,
+            creator: (chatbot.creator as string) || account || '',
+            totalEarnings: Number(chatbot.totalEarnings) || 0
+          };
+        } else {
+          // If the data is wrapped in a metadata object or array
+          const metadataObj = Array.isArray(chatbot) ? chatbot[1] : chatbot;
+          metadata = {
+            name: String(metadataObj?.name || 'Unknown Chatbot'),
+            characteristics: Array.isArray(metadataObj?.characteristics) 
+              ? metadataObj.characteristics 
+              : [],
+            conversationCount: Number(metadataObj?.conversationCount) || 0,
+            createdAt: Number(metadataObj?.createdAt) || Date.now() / 1000,
+            creator: String(metadataObj?.creator || account || ''),
+            totalEarnings: Number(metadataObj?.totalEarnings) || 0
+          };
+        }
+
+        return {
+          tokenId: chatbot.tokenId,
+          metadata,
+          formattedDate: new Date(metadata.createdAt * 1000).toLocaleDateString(),
+          formattedEarnings: (metadata.totalEarnings / 1e18).toFixed(4) // Convert from wei
+        };
+      });
+
+      setEnhancedChatbots(processed);
+
+      // Calculate total stats
+      const stats = processed.reduce((acc, bot) => {
+        acc.totalConversations += bot.metadata.conversationCount;
+        acc.totalEarnings += Number(bot.formattedEarnings);
+        acc.totalChatbots += 1;
+        return acc;
+      }, { totalConversations: 0, totalEarnings: 0, totalChatbots: 0, averagePerBot: 0 });
+
+      stats.averagePerBot = stats.totalChatbots > 0 ? stats.totalEarnings / stats.totalChatbots : 0;
+      setTotalStats(stats);
+    } else {
+      setEnhancedChatbots([]);
+      setTotalStats({ totalConversations: 0, totalEarnings: 0, totalChatbots: 0, averagePerBot: 0 });
+    }
+  }, [userChatbots, account]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await Promise.all([refreshBalance(), refreshChatbots()]);
-    setIsRefreshing(false);
+    try {
+      await Promise.all([refreshBalance(), refreshChatbots()]);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const formatAddress = (address: string) => {
@@ -39,7 +138,7 @@ export default function Web3Dashboard() {
             Connect Your Wallet
           </CardTitle>
           <CardDescription>
-            Connect your wallet to access blockchain features
+            Connect your wallet to access blockchain features and view your NFT chatbots
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -85,71 +184,158 @@ export default function Web3Dashboard() {
               {parseFloat(tokenBalance).toFixed(2)} CHAT
             </Badge>
           </div>
+          
+          {/* Debug Section */}
+          <div className="pt-2 border-t">
+            <div className="flex justify-between items-center">
+              <Button variant="outline" size="sm" onClick={testConnection}>
+                <Bug className="h-4 w-4 mr-2" />
+                Test Connection
+              </Button>
+              {debugInfo && (
+                <div className="flex gap-2">
+                  <Badge variant={debugInfo.nft ? "default" : "destructive"}>
+                    NFT: {debugInfo.nft ? "✓" : "✗"}
+                  </Badge>
+                  <Badge variant={debugInfo.token ? "default" : "destructive"}>
+                    Token: {debugInfo.token ? "✓" : "✗"}
+                  </Badge>
+                </div>
+              )}
+            </div>
+          </div>
         </CardContent>
       </Card>
+
+      {/* Portfolio Stats */}
+      {totalStats.totalChatbots > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Portfolio Overview
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">{totalStats.totalChatbots}</div>
+                <div className="text-sm text-gray-600">NFT Chatbots</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">{totalStats.totalConversations}</div>
+                <div className="text-sm text-gray-600">Total Conversations</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">{totalStats.totalEarnings.toFixed(4)}</div>
+                <div className="text-sm text-gray-600">Total Earnings (CHAT)</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-orange-600">{totalStats.averagePerBot.toFixed(4)}</div>
+                <div className="text-sm text-gray-600">Avg per Bot</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* NFT Chatbots */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Trophy className="h-5 w-5" />
-            Your NFT Chatbots ({userChatbots.length})
+            Your NFT Chatbots ({enhancedChatbots.length})
           </CardTitle>
           <CardDescription>
-            Chatbots you own as NFTs on the blockchain
+            Chatbots you own as NFTs on the blockchain with real-time stats
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {userChatbots.length === 0 ? (
-            <p className="text-center text-gray-500 py-8">
-              No NFT chatbots found. Create and mint your first chatbot!
-            </p>
+          {enhancedChatbots.length === 0 ? (
+            <div className="text-center py-8">
+              <Trophy className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500 mb-2">No NFT chatbots found</p>
+              <p className="text-sm text-gray-400">Create and mint your first chatbot to get started!</p>
+            </div>
           ) : (
             <div className="grid gap-4">
-              {userChatbots.map((chatbot) => (
-                <div key={chatbot.tokenId} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-semibold">{String(chatbot.name || 'Unknown')}</h3>
-                    <Badge variant="outline">#{chatbot.tokenId}</Badge>
+              {enhancedChatbots.map((chatbot) => (
+                <div key={chatbot.tokenId} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start mb-3">
+                    <h3 className="font-semibold text-lg">{chatbot.metadata.name}</h3>
+                    <Badge variant="outline" className="text-sm">
+                      NFT #{chatbot.tokenId}
+                    </Badge>
                   </div>
-                  <div className="space-y-2 text-sm text-gray-600">
-                    <div className="flex justify-between">
-                      <span>Conversations:</span>
-                      <span>{String(chatbot.conversationCount || '0')}</span>
+                  
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                    <div className="flex items-center gap-2">
+                      <MessageCircle className="h-4 w-4 text-blue-500" />
+                      <div>
+                        <div className="font-semibold">{chatbot.metadata.conversationCount}</div>
+                        <div className="text-xs text-gray-500">Conversations</div>
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Total Earnings:</span>
-                      <span className="flex items-center gap-1">
-                        <Coins className="h-3 w-3" />
-                        {parseFloat(String(chatbot.totalEarnings || '0')).toFixed(2)} CHAT
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <Coins className="h-4 w-4 text-green-500" />
+                      <div>
+                        <div className="font-semibold">{chatbot.formattedEarnings}</div>
+                        <div className="text-xs text-gray-500">CHAT Earned</div>
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Created:</span>
-                      <span>
-                        {chatbot.createdAt ? new Date(Number(chatbot.createdAt) * 1000).toLocaleDateString() : 'Unknown'}
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-purple-500" />
+                      <div>
+                        <div className="font-semibold text-sm">{chatbot.formattedDate}</div>
+                        <div className="text-xs text-gray-500">Created</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-orange-500" />
+                      <div>
+                        <div className="font-semibold text-sm">{formatAddress(chatbot.metadata.creator)}</div>
+                        <div className="text-xs text-gray-500">Creator</div>
+                      </div>
                     </div>
                   </div>
-                  <div className="mt-3">
-                    <p className="text-xs text-gray-500 mb-1">Characteristics:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {Array.isArray(chatbot.characteristics) ? (
+
+                  {/* Characteristics */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-700">Characteristics:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {chatbot.metadata.characteristics.length > 0 ? (
                         <>
-                          {(chatbot.characteristics as string[]).slice(0, 3).map((char: string, index: number) => (
+                          {chatbot.metadata.characteristics.slice(0, 3).map((char, index) => (
                             <Badge key={index} variant="secondary" className="text-xs">
                               {char.length > 20 ? `${char.slice(0, 20)}...` : char}
                             </Badge>
                           ))}
-                          {(chatbot.characteristics as string[]).length > 3 && (
+                          {chatbot.metadata.characteristics.length > 3 && (
                             <Badge variant="secondary" className="text-xs">
-                              +{(chatbot.characteristics as string[]).length - 3} more
+                              +{chatbot.metadata.characteristics.length - 3} more
                             </Badge>
                           )}
                         </>
                       ) : (
-                        <span className="text-xs text-gray-500">No characteristics</span>
+                        <span className="text-xs text-gray-500 italic">No characteristics defined</span>
                       )}
+                    </div>
+                  </div>
+
+                  {/* Performance Indicator */}
+                  <div className="mt-3 pt-3 border-t">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Performance:</span>
+                      <div className="flex items-center gap-1">
+                        {chatbot.metadata.conversationCount > 10 ? (
+                          <Badge variant="default" className="bg-green-500">High Activity</Badge>
+                        ) : chatbot.metadata.conversationCount > 5 ? (
+                          <Badge variant="secondary" className="bg-yellow-500">Moderate</Badge>
+                        ) : (
+                          <Badge variant="outline">Getting Started</Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

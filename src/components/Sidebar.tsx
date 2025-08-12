@@ -15,12 +15,16 @@ import {
   History,
   LayoutGrid,
   Settings,
+  BarChart3,
+  DollarSign,
 } from "lucide-react";
 
 const navLinks = [
   { href: "/create-chatpod", label: "Create Chatbot", icon: Bot },
   { href: "/view-chatpods", label: "View Chatbots", icon: LayoutGrid },
   { href: "/review-session", label: "Review Sessions", icon: History },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/earnings", label: "Earnings", icon: DollarSign },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -73,7 +77,7 @@ export function Sidebar() {
   );
 
   return (
-    <TooltipProvider>
+    <TooltipProvider >
       {/* Mobile Sidebar (Sheet) */}
       <div className="md:hidden">
         <Sheet>
@@ -110,7 +114,7 @@ export function Sidebar() {
       </aside>
 
       {/* Desktop Expanded Sidebar */}
-      <aside className="hidden lg:flex h-full w-64 min-h-screen flex-col border-r bg-background">
+      <aside className="hidden lg:flex w-64 min-h-screen flex-col border-r bg-background">
         <div className="p-4 border-b h-[65px] flex items-center">
           <h2 className="text-xl font-bold">Chatbot AI</h2>
         </div>
