@@ -46,7 +46,14 @@ A revolutionary platform that combines AI chatbot creation with Web3 technology,
 - **Regular Chatbots**: Database-only chatbots for standard AI conversations
 - **NFT Chatbots**: Blockchain-enabled chatbots with ownership and monetization
 - **Flexible Choice**: Users can choose which type to create
-
+  
+###📁 Automatic Feature Extraction from Uploaded Files
+- **File Upload & Analysis: Users can upload a file (e.g., PDF, text, image, code, etc.) to the platform.
+- **Automatic Feature Extraction: The system will analyze the uploaded file and automatically extract key features, topics, or entities (e.g., summary, keywords, code functions, metadata).
+- **Chatbot Enrichment: The extracted features will be used to enrich the chatbot's personality, context, or knowledge base, making responses more relevant and personalized.
+- **AI-Powered Insight: Utilizes AI models to interpret file content, whether it's a research paper, codebase, or user manual, and integrates insights seamlessly into the chatbot.
+- **Supported File Types: Text, documents, images, and code files are supported for automatic feature extraction.
+- 
 ## 🏗️ Architecture
 
 ### **Frontend Stack**
