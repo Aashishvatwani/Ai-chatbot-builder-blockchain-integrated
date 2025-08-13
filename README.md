@@ -53,7 +53,7 @@ A revolutionary platform that combines AI chatbot creation with Web3 technology,
 - **Chatbot Enrichment**: The extracted features will be used to enrich the chatbot's personality, context, or knowledge base, making responses more relevant and personalized.
 - **AI-Powered Insight**: Utilizes AI models to interpret file content, whether it's a research paper, codebase, or user manual, and integrates insights seamlessly into the chatbot.
 - **Supported File Types**: Text, documents, images, and code files are supported for automatic feature extraction.
-- 
+  
 ## 🏗️ Architecture
 
 ### **Frontend Stack**
