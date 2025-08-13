@@ -15,13 +15,14 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { ipfsService } from "@/lib/ipfsService";
 import { toast } from "sonner";
-import { Coins, Zap, Shield} from "lucide-react";
+import { Coins, Zap, Shield } from "lucide-react";
 import { useWeb3 } from "@/components/Web3Provider";
 
 function CreateChatpods() {
   const { user } = useUser();
   const [name, setName] = useState("");
   const [ipfsHash, setIpfsHash] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [shouldMintNFT, setShouldMintNFT] = useState(false);
   const [characteristics, setCharacteristics] = useState<string[]>([]);
   const [currentCharacteristic, setCurrentCharacteristic] = useState("");
@@ -29,21 +30,10 @@ function CreateChatpods() {
   const [isPending, startTransition] = useTransition();
   const { isConnected, mintChatbotNFT, connectWallet, account } = useWeb3();
 
-  const [createChatbot] = useMutation(CREATE_CHATBOT, {
-    client,
-  });
-
-  const [createChatbotBasic] = useMutation(CREATE_CHATBOT_BASIC, {
-    client,
-  });
-
-  const [updateChatbot] = useMutation(UPDATE_CHATPOD, {
-    client,
-  });
-
-  const [mintNFTMutation] = useMutation(MINT_CHATBOT_NFT, {
-    client,
-  });
+  const [createChatbot] = useMutation(CREATE_CHATBOT, { client });
+  const [createChatbotBasic] = useMutation(CREATE_CHATBOT_BASIC, { client });
+  const [updateChatbot] = useMutation(UPDATE_CHATPOD, { client });
+  const [mintNFTMutation] = useMutation(MINT_CHATBOT_NFT, { client });
 
   const addCharacteristic = () => {
     if (currentCharacteristic.trim() && characteristics.length < 5) {
@@ -64,109 +54,56 @@ function CreateChatpods() {
       return;
     }
 
+
     if (shouldMintNFT && !isConnected) {
       toast.error("Please connect your wallet to mint an NFT");
       return;
     }
 
-    startTransition(async () => {
-      try {
-        // Step 1: Create chatbot in database
-        console.log("Creating chatbot with variables:", {
-          clerk_user_id: user?.id,
-          name,
-          ipfs_hash: ipfsHash.trim() || null,
-        });
-        
-        let data, errors;
+   startTransition(async () => {
+  try {
+    // Step 0: Validate file/IPFS presence if NFT minting is requested
+    if (shouldMintNFT && !file && !characteristics) {
+      toast.error("NFT minting requires a file upload or IPFS metadata");
+      return;
+    }
 
-        try {
-          // Try creating with IPFS hash field first
-          const result = await createChatbot({
-            variables: {
-              clerk_user_id: user?.id,
-              name,
-              ipfs_hash: ipfsHash.trim() || null,
-            },
-          });
-          data = result.data;
-          errors = result.errors;
-        } catch (createError) {
-          console.log("Main create failed, trying basic create:", createError);
-          // Fallback to basic creation without ipfs_hash
-          const result = await createChatbotBasic({
-            variables: {
-              clerk_user_id: user?.id,
-              name,
-            },
-          });
-          data = result.data;
-          errors = result.errors;
-        }
+    // Step 1: If file exists, upload to IPFS first
+    let finalIpfsHash = ipfsHash;
+    if (file) {
+      toast.loading("Uploading file to IPFS...", { id: "ipfs-upload" });
+      finalIpfsHash = await ipfsService.uploadFile(file, file.name);
+      toast.success("File uploaded to IPFS!", { id: "ipfs-upload" });
+    }
 
-        if (errors) {
-          console.error("GraphQL errors:", errors);
-          throw new Error(`GraphQL Error: ${errors.map(e => e.message).join(', ')}`);
-        }
+    // Step 2: Create chatbot in database
+    let data, errors;
+    try {
+      const result = await createChatbot({
+        variables: { clerk_user_id: user?.id, name, ipfs_hash: finalIpfsHash || null },
+      });
+      data = result.data;
+      errors = result.errors;
+    } catch {
+      const result = await createChatbotBasic({
+        variables: { clerk_user_id: user?.id, name },
+      });
+      data = result.data;
+      errors = result.errors;
+    }
 
-        if (!data?.insert_chatbots?.returning?.[0]?.id) {
-          throw new Error("Failed to create chatbot - no ID returned");
-        }
+    if (errors) throw new Error(errors.map((e: any) => e.message).join(', '));
+    if (!data?.insert_chatbots?.returning?.[0]?.id) throw new Error("Failed to create chatbot");
 
-       const  chatbotId = data.insert_chatbots.returning[0].id;
-        console.log("Chatbot created with ID:", chatbotId);
+    const chatbotId = data.insert_chatbots.returning[0].id;
 
-        // Step 2: Add characteristics if any
-        if (characteristics.length > 0) {
-          // You would need to create a mutation to add multiple characteristics
-          // For now, we'll add them individually in the edit page
-        }
+    // Step 3: Update chatbot with IPFS hash if needed
+    if (finalIpfsHash && !ipfsHash) {
+      await updateChatbot({ variables: { id: chatbotId, ipfs_hash: finalIpfsHash } });
+    }
 
-        // Step 3: Auto-generate IPFS metadata if no hash provided
-        let finalIpfsHash = ipfsHash.trim();
-        if (!finalIpfsHash && characteristics.length > 0) {
-          try {
-            toast.loading("Generating IPFS metadata...", { id: "ipfs-gen" });
-            const { metadataHash } = await ipfsService.uploadChatbotMetadata(
-              chatbotId,
-              name,
-              characteristics
-            );
-            finalIpfsHash = metadataHash;
-            
-            // Update chatbot with generated IPFS hash
-            console.log("Updating chatbot with IPFS hash:", {
-              id: chatbotId,
-              name: name,
-              ipfs_hash: metadataHash
-            });
-            
-            const { data: updateData, errors: updateErrors } = await updateChatbot({
-              variables: {
-                id: chatbotId,
-                name: name, // Keep the same name
-                ipfs_hash: metadataHash
-              }
-            });
-
-            if (updateErrors) {
-              console.error("Update GraphQL errors:", updateErrors);
-              throw new Error(`Update Error: ${updateErrors.map(e => e.message).join(', ')}`);
-            }
-
-            console.log("Chatbot updated successfully:", updateData);
-            
-            toast.success("IPFS metadata generated!", { id: "ipfs-gen" });
-            console.log("Auto-generated IPFS hash:", metadataHash);
-          } catch (ipfsError) {
-            console.error("IPFS upload failed, continuing without:", ipfsError);
-            toast.dismiss("ipfs-gen");
-            // Continue without IPFS - chatbot will work with just characteristics
-          }
-        }
-
-        // Step 4: Mint NFT if requested
-        let nftResult = null;
+    // Step 4: Mint NFT if requested and wallet connected
+    let nftResult = null;
         if (shouldMintNFT && isConnected) {
           try {
             toast.loading("Minting NFT...", { id: "nft-mint" });
@@ -193,29 +130,25 @@ function CreateChatpods() {
             toast.error("Failed to mint NFT, but chatbot was created", { id: "nft-mint" });
           }
         }
+    // Step 5: Reset form and navigate
+    setName("");
+    setIpfsHash("");
+    setFile(null);
+    setCharacteristics([]);
+    setShouldMintNFT(false);
 
-        // Reset form
-        setName("");
-        setIpfsHash("");
-        setCharacteristics([]);
-        setShouldMintNFT(false);
+    router.push(`/edit-chatpod/${chatbotId}`);
+    toast.success(
+      `Chatbot created successfully! ${nftResult ? `NFT Token ID: ${nftResult.tokenId}` : ''}`
+    );
 
-        // Navigate to edit page
-        router.push(`/edit-chatpod/${chatbotId}`);
-        
-        toast.success(
-          finalIpfsHash 
-            ? `Chatbot created with IPFS metadata! ${nftResult ? `NFT Token ID: ${nftResult.tokenId}` : ''}` 
-            : `Chatbot created successfully! ${nftResult ? `NFT Token ID: ${nftResult.tokenId}` : ''}`
-        );
+  } catch (error) {
+    console.error("Error:", error);
+    toast.error("Failed to create chatbot");
+  }
+});
 
-      } catch (error) {
-        console.error("Error creating chatbot:", error);
-        toast.error("Failed to create chatbot");
-      }
-    });
   };
-
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
       <Card>
@@ -250,6 +183,91 @@ function CreateChatpods() {
                   Choose a memorable name for your AI assistant
                 </p>
               </div>
+              {/*File Uploader */}
+<div className="space-y-2">
+  <Label className="text-sm font-medium">
+    Upload File (PDF or DOCX, ≤ 200KB) 📁
+  </Label>
+
+  <div
+    className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+      file ? "border-green-400 bg-green-50" : "border-gray-300"
+    }`}
+    onDragOver={(e) => {
+      e.preventDefault();
+      e.currentTarget.classList.add("border-blue-500", "bg-blue-50");
+    }}
+    onDragLeave={(e) => {
+      e.preventDefault();
+      e.currentTarget.classList.remove("border-blue-500", "bg-blue-50");
+    }}
+    onDrop={(e) => {
+      e.preventDefault();
+      e.currentTarget.classList.remove("border-blue-500", "bg-blue-50");
+      const dropped = e.dataTransfer.files[0];
+      if (!dropped) return;
+
+      if (!["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"].includes(dropped.type)) {
+        toast.error("Only PDF or DOCX files are allowed");
+        return;
+      }
+      if (dropped.size > 200 * 1024) {
+        toast.error("File size exceeds 200KB");
+        return;
+      }
+
+      setFile(dropped);
+      setIpfsHash(""); // Clear IPFS input if file is uploaded
+      toast.success(`File "${dropped.name}" selected ✅`);
+    }}
+  >
+    <label className="flex flex-col items-center gap-2">
+      <span className="text-4xl">📂</span>
+      <span className="text-sm text-gray-600">
+        Drag & drop your file here or click to upload
+      </span>
+      <input
+        type="file"
+        accept=".pdf,.docx"
+        className="hidden"
+        onChange={(e) => {
+          const selected = e.target.files?.[0];
+          if (!selected) return;
+
+          if (!["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"].includes(selected.type)) {
+            toast.error("Only PDF or DOCX files are allowed");
+            return;
+          }
+          if (selected.size > 200 * 1024) {
+            toast.error("File size exceeds 200KB");
+            return;
+          }
+
+          setFile(selected);
+          setIpfsHash(""); // Clear IPFS input if file is uploaded
+          toast.success(`File "${selected.name}" selected ✅`);
+        }}
+      />
+    </label>
+
+    {file && (
+      <div className="mt-2 flex items-center justify-between bg-gray-50 p-2 rounded shadow-sm">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">📄</span>
+          <span className="text-sm font-medium">{file.name}</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setFile(null)}
+          className="text-red-500 hover:text-red-700 text-sm font-semibold"
+        >
+          Remove
+        </button>
+      </div>
+    )}
+  </div>
+</div>
+
 
               {/* IPFS Hash Input */}
               <div className="space-y-2">
@@ -262,6 +280,7 @@ function CreateChatpods() {
                   value={ipfsHash}
                   onChange={(e) => setIpfsHash(e.target.value)}
                   className="w-full font-mono text-sm"
+                   disabled={file !== null} 
                 />
                 <p className="text-xs text-gray-500">
                   Optional: Provide existing IPFS hash or leave empty to auto-generate metadata from characteristics
