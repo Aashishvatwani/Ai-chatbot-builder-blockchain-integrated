@@ -78,7 +78,7 @@ export default function EarningsPage() {
   });
   
   // Custom earnings tracking with baseline
-  const BASELINE_BALANCE = 1000030.00000; // Starting baseline amount
+  const BASELINE_BALANCE = 1010000.00000; // Starting baseline amount
   const [customEarnings, setCustomEarnings] = useState({
     totalEarned: 0,
     dailyEarnings: 0,

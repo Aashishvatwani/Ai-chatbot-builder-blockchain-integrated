@@ -47,6 +47,7 @@ export interface ChatbotCharacteristic {
     chatbot_id: number;
 }
 
+
 export interface Message {
     id: number;
     chat_session_id: number;

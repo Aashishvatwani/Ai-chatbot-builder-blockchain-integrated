@@ -41,14 +41,20 @@ async function fetchIPFSMetadata(ipfsHash: string): Promise<IPFSMetadata | null>
   try {
     const url = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
     const response = await fetch(url);
-    
+
     if (!response.ok) {
       console.error(`Failed to fetch IPFS metadata: ${response.status}`);
       return null;
     }
-    
-    const metadata = await response.json();
-    return metadata as IPFSMetadata;
+
+    // Always attempt to parse as JSON, regardless of content type
+    try {
+      const metadata = await response.json();
+      return metadata as IPFSMetadata;
+    } catch (jsonError) {
+      console.error('IPFS metadata is not valid JSON:', jsonError);
+      return null;
+    }
   } catch (error) {
     console.error('Error fetching IPFS metadata:', error);
     return null;
